@@ -12,7 +12,7 @@
     tags: always
     ansible.builtin.copy:
       src: sudoers_ansible
-      dst: /etc/sudoers.d/ansible
+      dest: /etc/sudoers.d/ansible
       owner: root
       group: root
       mode: 0440
