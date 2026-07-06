@@ -9,9 +9,14 @@
 - hosts: proxmox_servers
   become: true
   tasks:
-  - name: install updates proxmox
+  - name: Update apt repo and cache proxmox
     ansible.builtin.apt:
-      update_cache: true
+        update_cache: true
+        cache_valid_time: 3600
+  
+  - name: Run apt dist-upgrade proxmox
+    ansible.builtin.apt:
+        upgrade: dist
 
 - hosts: windows_servers
   tasks:
