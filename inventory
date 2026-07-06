@@ -1,3 +1,9 @@
+[proxmox_servers]
 pve.home.local
+
+[centos_servers]
 centos.home.local
 centos-ws.home.local
+
+[windows_servers]
+dc.home.local
