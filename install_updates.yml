@@ -1,7 +1,25 @@
 ---
-- hosts: all
+- hosts: centos_servers
   become: true
   tasks:
-  - name: install updates
+  - name: install updates centos
     ansible.builtin.dnf:
       update_cache: true
+
+- hosts: proxmox_servers
+  become: true
+  tasks:
+  - name: install updates proxmox
+    ansible.builtin.apt:
+      update_cache: true
+
+- hosts: windows_servers
+  tasks:
+  - name: install updates windows
+    ansible.windows.win_updates:
+      category_names:
+        - CriticalUpdates
+        - SecurityUpdates
+        - Updates
+        - UpdateRollups
+      state: installed
