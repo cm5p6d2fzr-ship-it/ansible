@@ -2,7 +2,6 @@
 pve.home.local
 
 [centos_servers]
-centos.home.local
 centos-ws.home.local
 
 [windows_servers]

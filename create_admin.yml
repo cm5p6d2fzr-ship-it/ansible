@@ -1,5 +1,5 @@
 ---
-- hosts: all
+- hosts: proxmox_servers, centos_servers
   become: true
   tasks:
   - name: create admin user
@@ -22,4 +22,3 @@
     ansible.builtin.authorized_key:
       user: ansible
       key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOaYuJoLm9qCVFCtBbqbU96HGV/gssVI1gXZRbzxjChH administrator@centos.home.local"
-      
