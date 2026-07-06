@@ -5,5 +5,4 @@
 
   - name: install updates
     ansible.builtin.dnf:
-      name: "*"
-      state: latest
+      update_cache: true
