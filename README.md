@@ -1,3 +1,3 @@
 # ansible
 
-Test environment for learning purposes.o
+Test environment for learning purposes.
