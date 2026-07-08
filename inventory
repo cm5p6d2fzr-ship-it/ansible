@@ -2,7 +2,7 @@
 pve.home.local
 
 [centos_servers]
-centos-ws.home.local
+centos02.home.local
 
 [windows_servers]
 dc.home.local
