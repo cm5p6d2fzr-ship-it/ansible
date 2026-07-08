@@ -11,7 +11,7 @@
 
     # Optional: restrict Linux login to this AD group.
     # Leave empty to skip realm permit.
-    ad_permit_group: "Linux Admins@home.local"
+    ad_permit_group: "domain admins@home.local"
 
   vars_prompt:
     - name: ad_join_password
