@@ -9,15 +9,49 @@
       - prompt: "provide proxmox vm id {{ target_vmids }}"
 
   tasks:
-    - name: Enable temporary root SSH
-      ansible.builtin.command:
-        cmd: >
-          qm guest exec {{ item }} --
-          bash -lc "
-          cat > /etc/ssh/sshd_config.d/99-temp-root-login.conf <<'EOF'
-          PermitRootLogin yes
-          PasswordAuthentication yes
-          EOF
-          systemctl restart sshd
-          "
-      loop: "{{ target_vmids }}"
+      - name: Check VM status
+        ansible.builtin.command:
+          cmd: "qm status {{ item }}"
+        register: vm_status
+        changed_when: false
+        loop: "{{ target_vmids }}"
+
+      - name: Start VM if not running
+        ansible.builtin.command:
+          cmd: "qm start {{ item.item }}"
+        when: "'status: running' not in item.stdout"
+        loop: "{{ vm_status.results }}"
+        loop_control:
+          label: "{{ item.item }}"
+
+      - name: Wait until VM status is running
+        ansible.builtin.command:
+          cmd: "qm status {{ item }}"
+        register: vm_running_status
+        retries: 30
+        delay: 5
+        until: "'status: running' in vm_running_status.stdout"
+        changed_when: false
+        loop: "{{ target_vmids }}"
+
+      - name: Wait for QEMU guest agent
+        ansible.builtin.command:
+          cmd: "qm guest ping {{ item }}"
+        register: guest_ping
+        retries: 30
+        delay: 5
+        until: guest_ping.rc == 0
+        changed_when: false
+        loop: "{{ target_vmids }}"
+      - name: Enable temporary root SSH
+        ansible.builtin.command:
+          cmd: >
+            qm guest exec {{ item }} --
+            bash -lc "
+            cat > /etc/ssh/sshd_config.d/99-temp-root-login.conf <<'EOF'
+            PermitRootLogin yes
+            PasswordAuthentication yes
+            EOF
+            systemctl restart sshd
+            "
+        loop: "{{ target_vmids }}"
