@@ -26,41 +26,51 @@
           - sssd
           - oddjob
           - oddjob-mkhomedir
+          - samba-common
           - samba-common-tools
           - krb5-workstation
           - adcli
-          - python3-pexpect
-          - NetworkManager
+          - authselect-compat
         state: present
-
-    - name: Ensure NetworkManager is enabled and running
-      ansible.builtin.systemd:
-        name: NetworkManager
-        enabled: true
-        state: started
-
-    - name: Get active NetworkManager connection
+    
+    - name: Check whether epel repo is enabled
       ansible.builtin.command:
-        cmd: nmcli -t -f NAME,DEVICE con show --active
-      register: active_nm_connections
+        cmd: yum -y install epel-release
+      register: epel_repo
       changed_when: false
+      failed_when: false
 
-    - name: Set active NetworkManager connection fact
-      ansible.builtin.set_fact:
-        active_nm_connection: "{{ active_nm_connections.stdout_lines[0].split(':')[0] }}"
-      when: active_nm_connections.stdout_lines | length > 0
+    - name: Create/edit SSSD configuration file
+      ansible.builtin.copy:
+        dest: /etc/sssd/sssd.conf
+        owner: root
+        group: root
+        mode: '0600'
+        backup: true
+        content: |
+          [sssd]
+          domains = home.local
+          config_file_version = 2
+          services = nss, pam
 
-    - name: Configure AD DNS server on active connection
-      ansible.builtin.command:
-        cmd: "nmcli con mod '{{ active_nm_connection }}' ipv4.dns '{{ ad_dns_server }}'"
-      changed_when: true
-      when: active_nm_connection is defined
-
-    - name: Restart active NetworkManager connection
-      ansible.builtin.command:
-        cmd: "nmcli con up '{{ active_nm_connection }}'"
-      changed_when: true
-      when: active_nm_connection is defined
+          [domain/home.local]
+          default_shell = /bin/bash
+          krb5_store_password_if_offline = True
+          cache_credentials = True
+          krb5_realm = HOME.LOCAL
+          realmd_tags = manages-system joined-with-adcli
+          id_provider = ad
+          fallback_homedir = /home/%u
+          ad_domain = home.local
+          use_fully_qualified_names = False
+          ldap_id_mapping = True
+          access_provider = simple
+          dyndns_update = true
+          dyndns_update_ptr = true
+          dyndns_auth_ptr = GSS-TSIG
+          dyndns_auth = GSS-TSIG
+          simple_allow_groups = domain admins@home.local
+      notify: Restart sssd
 
     - name: Check whether server is already joined to AD
       ansible.builtin.command:
@@ -79,8 +89,6 @@
         command: >
           realm join -v {{ ad_domain }}
           -U {{ ad_join_user }}
-          --client-software=sssd
-          --membership-software=samba
         responses:
           "(?i)Password.*": "{{ ad_join_password }}"
         timeout: 120
@@ -121,3 +129,9 @@
     - name: Show AD lookup result
       ansible.builtin.debug:
         var: getent_ad_user.stdout
+
+  handlers:
+    - name: Restart sssd
+      ansible.builtin.systemd:
+        name: sssd
+        state: restarted

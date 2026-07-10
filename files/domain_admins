@@ -1,0 +1,2 @@
+# Managed by Ansible
+%domain\ admins ALL=(ALL) ALL

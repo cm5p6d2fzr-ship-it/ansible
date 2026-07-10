@@ -1,0 +1,3 @@
+---
+- name: Join CentOS Stream servers to Active Directory
+  hosts: proxmox_servers
