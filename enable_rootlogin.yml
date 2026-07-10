@@ -9,10 +9,6 @@
       prompt: "Enter Proxmox VMID(s), comma-separated, for example: 101 or 101,102,103"
       private: false
 
-    - name: ansible_public_key
-      prompt: "Paste the SSH public key for the Ansible user"
-      private: false
-
   vars:
     target_vmids: "{{ target_vmids_input.split(',') | map('trim') | list }}"
     ansible_bootstrap_user: ansible
