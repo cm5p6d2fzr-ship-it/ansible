@@ -1,5 +1,5 @@
 [proxmox_servers]
-pve.home.local
+pve.home.local ansible_user=root
 
 [centos_servers]
 centos02.home.local
