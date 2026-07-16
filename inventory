@@ -6,3 +6,6 @@ centos02.home.local
 
 [windows_servers]
 dc.home.local
+
+[template_servers]
+192.168.1.49 ansible_user=root

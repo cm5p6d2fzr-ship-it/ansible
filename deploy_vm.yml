@@ -1,3 +1,214 @@
 ---
-- name: Join CentOS Stream servers to Active Directory
-  hosts: proxmox_servers
+- name: Configure CentOS Stream servers for my LAB
+  hosts: template_servers
+  become: true
+
+  vars:
+    ad_domain: home.local
+    ad_realm: HOME.LOCAL
+    ad_join_user: administrator
+    ad_dns_server: 192.168.1.6
+
+    # Optional: restrict Linux login to this AD group.
+    # Leave empty to skip realm permit.
+    ad_permit_group: "domain admins@home.local"
+
+  vars_prompt:
+    - name: ad_join_password
+      prompt: "AD password for {{ ad_join_user }}@{{ ad_realm }}"
+      private: true
+
+    - name: new_hostname
+      prompt: "Enter the new hostname for the server"
+      private: false
+
+    - name: new_ipaddr
+      prompt: "Enter the ip address for the server"
+      private: false
+
+  tasks:
+    - name: Check whether epel repo is enabled
+      ansible.builtin.command:
+        cmd: yum -y install epel-release
+      register: epel_repo
+      changed_when: false
+      failed_when: false
+
+    - name: Update os
+      ansible.builtin.command:
+        cmd: yum -y update
+      register: os_update
+      changed_when: false
+      failed_when: false
+    
+    - name: Change hostname of the server
+      ansible.builtin.command:
+        cmd: hostnamectl set-hostname {{ new_hostname }}@{{ ad_realm }}
+      register: realm_list
+      changed_when: false
+      failed_when: false
+    
+    - name: Install required packages for AD join
+      ansible.builtin.dnf:
+        name:
+          - realmd
+          - sssd
+          - oddjob
+          - oddjob-mkhomedir
+          - samba-common
+          - samba-common-tools
+          - krb5-workstation
+          - adcli
+          - authselect-compat
+        state: present
+
+    - name: Create/edit SSSD configuration file
+      ansible.builtin.copy:
+        dest: /etc/sssd/sssd.conf
+        owner: root
+        group: root
+        mode: '0600'
+        backup: true
+        content: |
+          [sssd]
+          domains = home.local
+          config_file_version = 2
+          services = nss, pam
+
+          [domain/home.local]
+          default_shell = /bin/bash
+          krb5_store_password_if_offline = True
+          cache_credentials = True
+          krb5_realm = HOME.LOCAL
+          realmd_tags = manages-system joined-with-adcli
+          id_provider = ad
+          fallback_homedir = /home/%u
+          ad_domain = home.local
+          use_fully_qualified_names = False
+          ldap_id_mapping = True
+          access_provider = simple
+          dyndns_update = true
+          dyndns_update_ptr = true
+          dyndns_auth_ptr = GSS-TSIG
+          dyndns_auth = GSS-TSIG
+          simple_allow_groups = domain admins@home.local
+      notify: Restart sssd
+
+    - name: Check whether server is already joined to AD
+      ansible.builtin.command:
+        cmd: realm list
+      register: realm_list
+      changed_when: false
+      failed_when: false
+
+    - name: Discover AD domain
+      ansible.builtin.command:
+        cmd: "realm discover {{ ad_domain }}"
+      changed_when: false
+
+    - name: Join AD domain using Samba membership and SSSD client
+      ansible.builtin.expect:
+        command: >
+          realm join -v {{ ad_domain }}
+          -U {{ ad_join_user }}
+        responses:
+          "(?i)Password.*": "{{ ad_join_password }}"
+        timeout: 120
+      no_log: true
+      when: ad_domain not in realm_list.stdout
+
+    - name: Select SSSD auth profile with home directory creation
+      ansible.builtin.command:
+        cmd: authselect select sssd with-mkhomedir --force
+      changed_when: true
+
+    - name: Enable and restart SSSD
+      ansible.builtin.systemd:
+        name: sssd
+        enabled: true
+        state: restarted
+
+    - name: Enable and start oddjobd
+      ansible.builtin.systemd:
+        name: oddjobd
+        enabled: true
+        state: started
+
+    - name: Permit selected AD group to log in
+      ansible.builtin.command:
+        cmd: "realm permit -g '{{ ad_permit_group }}'"
+      changed_when: true
+      when:
+        - ad_permit_group is defined
+        - ad_permit_group | length > 0
+
+    - name: Validate AD user lookup
+      ansible.builtin.command:
+        cmd: "getent passwd {{ ad_join_user }}@{{ ad_domain }}"
+      register: getent_ad_user
+      changed_when: false
+
+    - name: Show AD lookup result
+      ansible.builtin.debug:
+        var: getent_ad_user.stdout
+    
+    - name: Determine active network interface
+      ansible.builtin.set_fact:
+        network_interface: "{{ ansible_default_ipv4.interface }}"
+        
+    - name: Determine NetworkManager connection name
+      ansible.builtin.command:
+        cmd: >
+          nmcli -g GENERAL.CONNECTION
+          device show {{ network_interface }}
+      register: nmcli_connection
+      changed_when: false
+
+    - name: Store connection name
+      ansible.builtin.set_fact:
+        connection_name: "{{ nmcli_connection.stdout | trim }}"
+
+    - name: Verify that an active connection was found
+      ansible.builtin.assert:
+        that:
+          - network_interface | length > 0
+          - connection_name | length > 0
+          - connection_name != "--"
+        fail_msg: >-
+          No active NetworkManager connection was found for
+          {{ network_interface }}.
+
+    - name: Show detected network configuration
+      ansible.builtin.debug:
+        msg:
+          - "Interface: {{ network_interface }}"
+          - "Connection: {{ connection_name }}"
+          - "Current IP: {{ ansible_default_ipv4.address }}"
+          - "New IP: {{ new_ip_address }}"
+          - "Gateway: {{ new_gateway }}"
+
+    - name: Configure the new static IP address
+      community.general.nmcli:
+        conn_name: "{{ connection_name }}"
+        ifname: "{{ network_interface }}"
+        type: ethernet
+        method4: manual
+        ip4:
+          - "{{ new_ip_address }}"
+        gw4: "{{ new_gateway }}"
+        autoconnect: true
+        state: present
+
+    - name: Activate the modified connection
+      community.general.nmcli:
+        conn_name: "{{ connection_name }}"
+        state: up
+      async: 30
+      poll: 0
+
+  handlers:
+    - name: Restart sssd
+      ansible.builtin.systemd:
+        name: sssd
+        state: restarted
+  
