@@ -122,18 +122,6 @@
         cmd: authselect select sssd with-mkhomedir --force
       changed_when: true
 
-    - name: Enable and restart SSSD
-      ansible.builtin.systemd:
-        name: sssd
-        enabled: true
-        state: restarted
-
-    - name: Enable and start oddjobd
-      ansible.builtin.systemd:
-        name: oddjobd
-        enabled: true
-        state: started
-
     - name: Permit selected AD group to log in
       ansible.builtin.command:
         cmd: "realm permit -g '{{ ad_permit_group }}'"
@@ -206,9 +194,9 @@
       async: 30
       poll: 0
 
-  handlers:
-    - name: Restart sssd
-      ansible.builtin.systemd:
-        name: sssd
-        state: restarted
+    - name: Restart the vm 
+      ansible.builtin.reboot: 
+        msg: "Server reboot initiated by Ansible"
+        pre_reboot_delay: 5
+
   
