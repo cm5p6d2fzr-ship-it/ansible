@@ -129,16 +129,6 @@
       when:
         - ad_permit_group is defined
         - ad_permit_group | length > 0
-
-    - name: Validate AD user lookup
-      ansible.builtin.command:
-        cmd: "getent passwd {{ ad_join_user }}@{{ ad_domain }}"
-      register: getent_ad_user
-      changed_when: false
-
-    - name: Show AD lookup result
-      ansible.builtin.debug:
-        var: getent_ad_user.stdout
     
     - name: Determine active network interface
       ansible.builtin.set_fact:
