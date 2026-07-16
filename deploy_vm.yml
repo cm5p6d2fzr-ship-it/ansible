@@ -162,8 +162,7 @@
           - "Interface: {{ network_interface }}"
           - "Connection: {{ connection_name }}"
           - "Current IP: {{ ansible_default_ipv4.address }}"
-          - "New IP: {{ new_ip_address }}"
-          - "Gateway: {{ new_gateway }}"
+          - "New IP: {{ new_ipaddr }}"
 
     - name: Configure the new static IP address
       community.general.nmcli:
@@ -172,8 +171,7 @@
         type: ethernet
         method4: manual
         ip4:
-          - "{{ new_ip_address }}"
-        gw4: "{{ new_gateway }}"
+          - "{{ new_ipaddr }}"
         autoconnect: true
         state: present
 
