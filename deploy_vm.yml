@@ -182,8 +182,7 @@
       poll: 0
 
     - name: Restart the vm 
-      ansible.builtin.reboot: 
-        msg: "Server reboot initiated by Ansible"
-        pre_reboot_delay: 5
+      ansible.builtin.command:
+        cmd: reboot now 
 
   
