@@ -92,7 +92,6 @@
           dyndns_auth_ptr = GSS-TSIG
           dyndns_auth = GSS-TSIG
           simple_allow_groups = domain admins@home.local
-      notify: Restart sssd
 
     - name: Check whether server is already joined to AD
       ansible.builtin.command:
